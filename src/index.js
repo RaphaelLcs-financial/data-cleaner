@@ -172,9 +172,54 @@ function cleanData(data, options) {
             return String(itemValue).startsWith(value);
           case 'endsWith':
             return String(itemValue).endsWith(value);
+          case 'regex':
+            return new RegExp(value).test(String(itemValue));
           default:
             return true;
         }
+      });
+    }
+  }
+
+// 数据转换
+  if (options.transform) {
+    if (Array.isArray(cleaned)) {
+      const { column, transform: transformFn } = options.transform;
+      cleaned = cleaned.map(item => {
+        if (column && item[column] !== undefined) {
+          switch (transformFn) {
+            case 'uppercase':
+              item[column] = String(item[column]).toUpperCase();
+              break;
+            case 'lowercase':
+              item[column] = String(item[column]).toLowerCase();
+              break;
+            case 'capitalize':
+              item[column] = String(item[column]).charAt(0).toUpperCase() + String(item[column]).slice(1).toLowerCase();
+              break;
+            case 'trim':
+              item[column] = String(item[column]).trim();
+              break;
+            case 'number':
+              item[column] = Number(item[column]);
+              break;
+            case 'string':
+              item[column] = String(item[column]);
+              break;
+            default:
+              if (transformFn.startsWith('replace:')) {
+                const [from, to] = transformFn.split(':')[1].split(',');
+                item[column] = String(item[column]).split(from).join(to);
+              } else if (transformFn.startsWith('multiply:')) {
+                const factor = Number(transformFn.split(':')[1]);
+                item[column] = Number(item[column]) * factor;
+              } else if (transformFn.startsWith('divide:')) {
+                const divisor = Number(transformFn.split(':')[1]);
+                item[column] = Number(item[column]) / divisor;
+              }
+          }
+        }
+        return item;
       });
     }
   }
@@ -294,6 +339,7 @@ program
   .option('-S, --sort <column>', '按列排序')
   .option('--order <dir>', '排序方向（asc/desc）', 'asc')
   .option('-l, --limit <number>', '限制输出数量', parseInt)
+  .option('--transform <expr>', '转换表达式（column:transform[:args]）')
   .option('--stats', '显示统计信息')
   .description('清洗数据文件')
   .action(async (input, output, options) => {
@@ -329,7 +375,18 @@ program
         };
       }
     }
-    
+
+    // 解析转换表达式
+    if (options.transform) {
+      const parts = options.transform.split(':');
+      if (parts.length >= 2) {
+        options.transform = {
+          column: parts[0],
+          transform: parts[1]
+        };
+      }
+    }
+
     // 解析列
     if (options.columns) {
       options.columns = options.columns.split(',');
