@@ -1,0 +1,30 @@
+{
+  "name": "@claw-dev/data-cleaner",
+  "version": "1.0.0",
+  "description": "数据清洗工具 - 快速清洗和转换数据文件",
+  "main": "src/index.js",
+  "bin": {
+    "data-cleaner": "./bin/cli.js"
+  },
+  "scripts": {
+    "clean": "node src/index.js clean"
+  },
+  "keywords": [
+    "data",
+    "cleaning",
+    "csv",
+    "json",
+    "transformation"
+  ],
+  "author": "梦心",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^12.1.0",
+    "chalk": "^4.1.2",
+    "csv-parse": "^5.5.0",
+    "csv-stringify": "^6.4.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

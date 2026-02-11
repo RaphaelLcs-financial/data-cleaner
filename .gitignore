@@ -1,0 +1,4 @@
+node_modules/
+*.log
+*.cleaned.*
+.DS_Store
