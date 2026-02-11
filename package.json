@@ -1,7 +1,7 @@
 {
   "name": "@raphaellcs/data-cleaner",
-  "version": "1.0.0",
-  "description": "数据清洗工具 - 快速清洗和转换数据文件",
+  "version": "2.0.0",
+  "description": "数据清洗工具 - 验证、分组、透视表",
   "main": "src/index.js",
   "bin": {
     "data-cleaner": "./bin/cli.js"

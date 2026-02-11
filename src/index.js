@@ -6,6 +6,17 @@ const { program } = require('commander');
 const chalk = require('chalk');
 const { parse } = require('csv-parse');
 const { stringify } = require('csv-stringify');
+const {
+  DataValidator,
+  createValidatorFromConfig
+} = require('./validator.js');
+const {
+  groupAndAggregate,
+  groupByTime,
+  getGroupStats,
+  pivotTable,
+  printGroupStats
+} = require('./grouper.js');
 
 // 读取文件
 function readFile(filePath) {
@@ -347,23 +358,23 @@ program
       console.log(chalk.red(`文件不存在: ${input}`));
       process.exit(1);
     }
-    
+
     const ext = path.extname(input).toLowerCase();
     const outputFormat = options.format || (ext === '.json' ? 'json' : 'csv');
     const outputFile = output || input.replace(/\.[^.]+$/, `.cleaned.${outputFormat}`);
-    
+
     console.log(chalk.cyan(`\n🔧 清洗数据\n`));
     console.log(chalk.gray(`输入: ${input}`));
     console.log(chalk.gray(`输出: ${outputFile}\n`));
-    
+
     const data = await readFile(input);
-    
+
     // 显示原始统计
     if (options.stats) {
       console.log(chalk.cyan('原始数据:'));
       printStats(getStats(data));
     }
-    
+
     // 解析过滤表达式
     if (options.filter) {
       const parts = options.filter.split(':');
@@ -391,29 +402,267 @@ program
     if (options.columns) {
       options.columns = options.columns.split(',');
     }
-    
+
     // 清洗数据
     const cleaned = cleanData(data, options);
-    
+
     // 显示清洗后统计
     if (options.stats) {
       console.log(chalk.cyan('清洗后数据:'));
       printStats(getStats(cleaned));
     }
-    
+
     // 写入文件
     await writeFile(outputFile, cleaned, outputFormat);
-    
+
     console.log(chalk.green(`✅ 已保存到: ${outputFile}`));
-    
+
     // 显示差异
     const originalCount = Array.isArray(data) ? data.length : 1;
     const cleanedCount = Array.isArray(cleaned) ? cleaned.length : 1;
     if (originalCount !== cleanedCount) {
       console.log(chalk.yellow(`   从 ${originalCount} 行减少到 ${cleanedCount} 行`));
     }
-    
+
     console.log();
+  });
+
+// 验证命令
+program
+  .command('validate <input>')
+  .option('-c, --config <path>', '验证规则配置文件（JSON）')
+  .option('-o, --output <path>', '输出错误报告到文件')
+  .option('--format <type>', '输出格式（json/csv）', 'json')
+  .description('验证数据')
+  .action(async (input, options) => {
+    if (!fs.existsSync(input)) {
+      console.log(chalk.red(`文件不存在: ${input}`));
+      process.exit(1);
+    }
+
+    const data = await readFile(input);
+
+    if (!Array.isArray(data)) {
+      console.log(chalk.red('数据必须是数组格式'));
+      process.exit(1);
+    }
+
+    console.log(chalk.cyan(`\n✅ 验证数据\n`));
+
+    let validator;
+
+    // 从配置文件加载规则
+    if (options.config) {
+      if (!fs.existsSync(options.config)) {
+        console.log(chalk.red(`配置文件不存在: ${options.config}`));
+        process.exit(1);
+      }
+      const configContent = fs.readFileSync(options.config, 'utf-8');
+      const config = JSON.parse(configContent);
+      validator = createValidatorFromConfig(config);
+      console.log(chalk.gray(`从配置文件加载规则: ${options.config}`));
+    } else {
+      // 没有配置，提示用户
+      console.log(chalk.yellow('未提供验证规则配置，跳过验证'));
+      console.log(chalk.gray('使用 --config 指定验证规则文件\n'));
+      process.exit(0);
+    }
+
+    console.log(chalk.gray(`规则数量: ${validator.getRuleCount()}`));
+    console.log();
+
+    // 执行验证
+    const errors = validator.getErrors(data);
+
+    if (errors.length === 0) {
+      console.log(chalk.green('✓ 所有数据验证通过！\n'));
+    } else {
+      console.log(chalk.red(`✗ 发现 ${errors.length} 个验证错误:\n`));
+
+      // 显示前 20 个错误
+      const displayErrors = errors.slice(0, 20);
+      for (const error of displayErrors) {
+        console.log(chalk.red(`  [行 ${error.row}] ${error.field}`));
+        console.log(chalk.gray(`    规则: ${error.rule}`));
+        console.log(chalk.gray(`    值: ${error.value}`));
+        console.log(chalk.gray(`    消息: ${error.message}\n`));
+      }
+
+      if (errors.length > 20) {
+        console.log(chalk.yellow(`... 还有 ${errors.length - 20} 个错误\n`));
+      }
+    }
+
+    // 输出错误报告
+    if (options.output && errors.length > 0) {
+      if (options.format === 'csv') {
+        const headers = ['row', 'field', 'rule', 'value', 'message'];
+        const rows = errors.map(e => [
+          e.row, e.field, e.rule,
+          `"${String(e.value).replace(/"/g, '""')}"`,
+          `"${e.message.replace(/"/g, '""')}"`
+        ]);
+        const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        fs.writeFileSync(options.output, csv, 'utf-8');
+      } else {
+        fs.writeFileSync(options.output, JSON.stringify(errors, null, 2), 'utf-8');
+      }
+      console.log(chalk.green(`✓ 错误报告已保存到: ${options.output}\n`));
+    }
+
+    process.exit(errors.length === 0 ? 0 : 1);
+  });
+
+// 分组命令
+program
+  .command('group <input>')
+  .option('-g, --group-by <field>', '分组字段（支持多个，逗号分隔）')
+  .option('-a, --aggregate <expr>', '聚合表达式（field:aggType，逗号分隔）')
+  .option('-t, --time-field <field>', '时间字段（用于时间分组）')
+  .option('-i, --interval <type>', '时间间隔（minute/hour/day/week/month/year）', 'day')
+  .option('-o, --output <path>', '输出文件')
+  .option('-f, --format <type>', '输出格式（json/csv）', 'json')
+  .option('--stats', '显示统计信息')
+  .description('分组和聚合数据')
+  .action(async (input, options) => {
+    if (!fs.existsSync(input)) {
+      console.log(chalk.red(`文件不存在: ${input}`));
+      process.exit(1);
+    }
+
+    const data = await readFile(input);
+
+    if (!Array.isArray(data)) {
+      console.log(chalk.red('数据必须是数组格式'));
+      process.exit(1);
+    }
+
+    console.log(chalk.cyan(`\n📊 分组和聚合\n`));
+
+    let result;
+
+    // 时间分组
+    if (options.timeField) {
+      const groups = groupByTime(data, options.timeField, options.interval);
+      console.log(chalk.gray(`时间字段: ${options.timeField}`));
+      console.log(chalk.gray(`时间间隔: ${options.interval}`));
+      console.log(chalk.gray(`分组数量: ${Object.keys(groups).length}\n`));
+
+      if (options.stats && options.aggregate) {
+        const aggParts = options.aggregate.split(',');
+        const aggregations = {};
+        for (const part of aggParts) {
+          const [field, aggType] = part.split(':');
+          aggregations[field] = aggType;
+        }
+
+        const stats = getGroupStats(groups, Object.keys(aggregations)[0]);
+        printGroupStats(stats);
+
+        // 转换为数组输出
+        result = groupAndAggregate(data, options.timeField, aggregations);
+      } else {
+        result = groups;
+      }
+    } else if (options.groupBy) {
+      // 字段分组
+      const groupByFields = options.groupBy.split(',');
+      const aggregations = {};
+
+      if (options.aggregate) {
+        const aggParts = options.aggregate.split(',');
+        for (const part of aggParts) {
+          const [field, aggType] = part.split(':');
+          aggregations[field] = aggType;
+        }
+      }
+
+      console.log(chalk.gray(`分组字段: ${groupByFields.join(', ')}`));
+      console.log(chalk.gray(`聚合规则: ${Object.keys(aggregations).join(', ') || '无'}\n`));
+
+      result = groupAndAggregate(data, groupByFields, aggregations);
+
+      // 显示结果
+      if (options.stats) {
+        for (const item of result) {
+          console.log(chalk.cyan(`  ${item._group}`));
+          console.log(chalk.gray(`    数量: ${item._count}`));
+          for (const [key, value] of Object.entries(item)) {
+            if (!key.startsWith('_')) {
+              console.log(chalk.gray(`    ${key}: ${typeof value === 'number' ? value.toFixed(2) : value}`));
+            }
+          }
+          console.log();
+        }
+      }
+    } else {
+      console.log(chalk.red('必须指定 --group-by 或 --time-field'));
+      process.exit(1);
+    }
+
+    // 输出文件
+    if (options.output) {
+      if (options.format === 'csv') {
+        await writeFile(options.output, result, 'csv');
+      } else {
+        fs.writeFileSync(options.output, JSON.stringify(result, null, 2), 'utf-8');
+      }
+      console.log(chalk.green(`✓ 已保存到: ${options.output}\n`));
+    }
+  });
+
+// 透视表命令
+program
+  .command('pivot <input>')
+  .option('-r, --rows <field>', '行字段')
+  .option('-c, --columns <field>', '列字段')
+  .option('-v, --values <field>', '值字段')
+  .option('-a, --agg <func>', '聚合函数（sum/avg/count/min/max）', 'sum')
+  .option('-o, --output <path>', '输出文件')
+  .description('创建数据透视表')
+  .action(async (input, options) => {
+    if (!fs.existsSync(input)) {
+      console.log(chalk.red(`文件不存在: ${input}`));
+      process.exit(1);
+    }
+
+    if (!options.rows || !options.columns || !options.values) {
+      console.log(chalk.red('必须指定 --rows, --columns 和 --values'));
+      process.exit(1);
+    }
+
+    const data = await readFile(input);
+
+    if (!Array.isArray(data)) {
+      console.log(chalk.red('数据必须是数组格式'));
+      process.exit(1);
+    }
+
+    console.log(chalk.cyan(`\n📊 数据透视表\n`));
+    console.log(chalk.gray(`行: ${options.rows}`));
+    console.log(chalk.gray(`列: ${options.columns}`));
+    console.log(chalk.gray(`值: ${options.values}`));
+    console.log(chalk.gray(`聚合: ${options.agg}\n`));
+
+    const pivot = pivotTable(data, options.rows, options.columns, options.values, options.agg);
+
+    // 打印透视表
+    console.log(chalk.cyan(`    ${pivot.columns.join('        ')}`));
+    for (const row of pivot.rows) {
+      const rowData = [row];
+      for (const col of pivot.columns) {
+        const value = pivot.data[row][col];
+        rowData.push((typeof value === 'number' ? value.toFixed(2) : value).padStart(12));
+      }
+      console.log(chalk.cyan(rowData.join('  ')));
+    }
+    console.log();
+
+    // 输出文件
+    if (options.output) {
+      fs.writeFileSync(options.output, JSON.stringify(pivot, null, 2), 'utf-8');
+      console.log(chalk.green(`✓ 已保存到: ${options.output}\n`));
+    }
   });
 
 program.parse();

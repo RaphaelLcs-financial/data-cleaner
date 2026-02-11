@@ -1,0 +1,16 @@
+{
+  "email": ["required", "email"],
+  "age": [
+    "required",
+    {"name": "number"},
+    {"name": "min", "value": 0},
+    {"name": "max", "value": 120}
+  ],
+  "phone": [
+    "required",
+    {"name": "pattern", "value": "^\\d{11}$", "message": "手机号必须是11位数字"}
+  ],
+  "status": [
+    {"name": "enum", "value": ["active", "inactive", "pending"]}
+  ]
+}

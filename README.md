@@ -16,6 +16,9 @@
 - **排序**：按列排序
 - **格式转换**：JSON ↔ CSV
 - **统计信息**：查看数据概况
+- **数据验证**：内置验证规则和自定义规则（新）
+- **分组聚合**：字段分组和时间分组（新）
+- **透视表**：创建数据透视表（新）
 
 ## 📦 安装
 
@@ -299,11 +302,134 @@ done
 ## 🚧 待实现
 
 - [ ] 支持更多文件格式（Excel、SQL）
-- [ ] 自定义转换函数
-- [ ] 正则表达式替换
-- [ ] 数据验证规则
 - [ ] 合并多个文件
-- [ ] 分组统计
+
+---
+
+## ✨ 新功能（v2.0.0）
+
+### 数据验证
+
+验证数据是否符合规则：
+
+```bash
+data-cleaner validate data.csv --config rules.json
+```
+
+创建验证规则配置 `rules.json`：
+
+```json
+{
+  "email": ["required", "email"],
+  "age": [
+    "required",
+    {"name": "number", "message": "年龄必须是数字"},
+    {"name": "min", "value": 0, "message": "年龄不能为负数"},
+    {"name": "max", "value": 120, "message": "年龄不能超过120"}
+  ],
+  "phone": [
+    {"name": "pattern", "value": "^\\d{11}$", "message": "手机号必须是11位数字"}
+  ],
+  "status": [
+    {"name": "enum", "value": ["active", "inactive", "pending"], "message": "状态值不合法"}
+  ]
+}
+```
+
+**内置验证规则：**
+- `required` - 必填
+- `email` - 邮箱格式
+- `url` - URL 格式
+- `number` - 数字
+- `integer` - 整数
+- `positive` - 正数
+- `negative` - 负数
+- `min:<value>` - 最小值
+- `max:<value>` - 最大值
+- `minLength:<length>` - 最小长度
+- `maxLength:<length>` - 最大长度
+- `pattern:<regex>` - 正则匹配
+- `enum:[values]` - 枚举值
+- `date` - 日期
+- `future` - 未来日期
+- `past` - 过去日期
+- `phone` - 电话号码
+
+输出错误报告：
+
+```bash
+data-cleaner validate data.csv --config rules.json --output errors.csv --format csv
+```
+
+### 分组聚合
+
+按字段分组并聚合：
+
+```bash
+# 按部门分组，计算平均工资
+data-cleaner group employees.csv --group-by department --aggregate "salary:avg" --stats
+
+# 多字段分组
+data-cleaner group sales.csv --group-by "region,category" --aggregate "revenue:sum,count" --output grouped.json
+```
+
+时间分组：
+
+```bash
+# 按天分组
+data-cleaner group orders.csv --time-field created_at --interval day --aggregate "amount:sum" --stats
+
+# 按月分组
+data-cleaner group orders.csv --time-field created_at --interval month --aggregate "amount:sum,count" --stats
+
+# 按小时分组
+data-cleaner group logs.csv --time-field timestamp --interval hour --aggregate "errors:sum" --stats
+```
+
+**聚合类型：**
+- `sum` - 求和
+- `avg` - 平均值
+- `min` - 最小值
+- `max` - 最大值
+- `count` - 计数
+- `count_distinct` - 去重计数
+- `first` - 第一个值
+- `last` - 最后一个值
+- `concat` - 拼接
+- `array` - 数组
+- `percentile:XX` - 百分位数（如 percentile:95）
+
+### 透视表
+
+创建数据透视表：
+
+```bash
+data-cleaner pivot sales.csv \
+  --rows region \
+  --columns product \
+  --values revenue \
+  --agg sum
+```
+
+示例输出：
+
+```
+    productA    productB    productC
+region1      15000.00    23000.00    18000.00
+region2      12000.00    25000.00    21000.00
+region3      18000.00    20000.00    22000.00
+```
+
+保存透视表：
+
+```bash
+data-cleaner pivot sales.csv \
+  --rows region \
+  --columns product \
+  --values revenue \
+  --agg sum \
+  --output pivot.json
+```
 
 ## 🤝 贡献
 
