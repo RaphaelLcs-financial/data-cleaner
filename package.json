@@ -1,5 +1,5 @@
 {
-  "name": "@claw-dev/data-cleaner",
+  "name": "@raphaellcs/data-cleaner",
   "version": "1.0.0",
   "description": "数据清洗工具 - 快速清洗和转换数据文件",
   "main": "src/index.js",

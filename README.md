@@ -1,4 +1,7 @@
 # @claw-dev/data-cleaner
+[![npm](https://img.shields.io/npm/v/@raphaellcs/data-cleaner)](https://www.npmjs.com/package/@raphaellcs/data-cleaner)
+[![downloads](https://img.shields.io/npm/dm/@raphaellcs/data-cleaner)](https://www.npmjs.com/package/@raphaellcs/data-cleaner)
+[![license](https://img.shields.io/npm/l/@raphaellcs/data-cleaner)](https://www.npmjs.com/package/@raphaellcs/data-cleaner)
 
 > 数据清洗工具 - 快速清洗和转换数据文件
 
