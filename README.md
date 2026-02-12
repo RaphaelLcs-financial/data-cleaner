@@ -1,9 +1,15 @@
 # @raphaellcs/data-cleaner
-[![npm](https://img.shields.io/npm/v/@raphaellcs/data-cleaner)](https://www.npmjs.com/package/@raphaellcs/data-cleaner)
-[![downloads](https://img.shields.io/npm/dm/@raphaellcs/data-cleaner)](https://www.npmjs.com/package/@raphaellcs/data-cleaner)
-[![license](https://img.shields.io/npm/l/@raphaellcs/data-cleaner)](https://www.npmjs.com/package/@raphaellcs/data-cleaner)
+[![npm](https://img.shields.io/npm/v/@raphaellcs/data-cleaner)](https://www.npmjs.org/package/@raphaellcs/data-cleaner)
+[![downloads](https://img.shields.io/npm/dm/@raphaellcs/data-cleaner)](https://www.npmjs.org/package/@raphaellcs/data-cleaner)
+[![license](https://img.shields.io/npm/l/@raphaellcs/data-cleaner)](https://www.npmjs.org/package/@raphaellcs/data-cleaner)
+[![GitHub stars](https://img.shields.io/github/stars/RaphaelLcs-financial/data-cleaner?style=social)](https://github.com/RaphaelLcs-financial/data-cleaner/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/RaphaelLcs-financial/data-cleaner)](https://github.com/RaphaelLcs-financial/data-cleaner/issues)
 
-> 数据清洗工具 - 快速清洗和转换数据文件
+> 数据清洗工具 - 验证、分组聚合、透视表
+
+## ⭐ 赞助
+
+如果这个工具对你有帮助，请给个 Star ⭐️ 或者考虑[赞助我](https://github.com/sponsors/RaphaelLcs-financial)！
 
 ## 🚀 功能
 
